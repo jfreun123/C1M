@@ -1,7 +1,7 @@
 # ---- Tests ----
 
 add_executable(add_test source/add_test.cpp)
-target_link_libraries(add_test PRIVATE cpp-starter_lib GTest::gtest_main)
+target_link_libraries(add_test PRIVATE C1M_lib GTest::gtest_main)
 target_compile_features(add_test PRIVATE cxx_std_23)
 
 set_target_properties(add_test PROPERTIES

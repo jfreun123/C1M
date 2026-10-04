@@ -1,17 +1,6 @@
-# cpp-starter
+# C1M
 
-A C++23 project template with CMake, Google Test, clang-tidy, cppcheck, clang-format, ASAN/TSAN, and GitHub Actions CI.
-
-## Using This Template
-
-1. Click **Use this template** on GitHub (or `gh repo create --template jacobfreund/cpp-starter`)
-2. Clone your new repo
-3. Rename `cpp-starter` → your project name in:
-   - `CMakeLists.txt` (`project(...)` and the `DEVELOPER_MODE` option)
-   - `CMakePresets.json` (the `cpp-starter_DEVELOPER_MODE` cache variable)
-   - `source/CMakeLists.txt` (the `cpp-starter_lib` target)
-   - `test/CMakeLists.txt` and `benchmark/CMakeLists.txt` (link targets)
-4. Replace `source/add.hpp`, `test/source/add_test.cpp`, and `benchmark/source/benchmark.cpp` with your code
+Working from the C10k problem up to one million concurrent connections, to learn networking.  Built from [cpp-starter](https://github.com/jfreun123/cpp-starter).
 
 ## Prerequisites
 
@@ -71,7 +60,7 @@ cmake --build build -t format-fix
 ## Project Structure
 
 ```
-cpp-starter/
+C1M/
 ├── source/                  # Header-only library
 │   ├── CMakeLists.txt
 │   └── add.hpp              # Replace with your headers

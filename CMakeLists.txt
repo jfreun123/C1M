@@ -7,7 +7,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 project(
-    cpp-starter
+    C1M
     VERSION 0.1.0
     DESCRIPTION "Short description"
     HOMEPAGE_URL "https://example.com/"
@@ -16,7 +16,7 @@ project(
 
 # ---- Developer mode ----
 
-option(cpp-starter_DEVELOPER_MODE "Enable developer mode" ON)
+option(C1M_DEVELOPER_MODE "Enable developer mode" ON)
 
 # ---- Build source ----
 
@@ -24,6 +24,6 @@ add_subdirectory(source)
 
 # ---- Developer mode targets ----
 
-if(cpp-starter_DEVELOPER_MODE)
+if(C1M_DEVELOPER_MODE)
   include(cmake/dev-mode.cmake)
 endif()
