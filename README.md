@@ -4,10 +4,10 @@ Working from the C10k problem up to one million concurrent connections, to learn
 
 ## Goals
 
-- [ ] Build the same echo server several ways (thread per connection, `select`, `poll`, `epoll`, `io_uring`) so the models can be compared like for like
+- [x] Build the same echo server several ways (thread per connection, `select`, `poll`, `epoll`, `io_uring`) so the models can be compared like for like
 - [ ] Add a UDP echo server next to the TCP ones
 - [ ] Push one machine from 10k to 100k to 1M concurrent connections, recording which limit broke at each step and what fixed it
-- [ ] Write a load generator that can open and hold that many connections
+- [x] Write a load generator that can open and hold that many connections
 - [ ] Measure every model:  memory per connection, latency, syscalls per request
 - [ ] Reproduce each failure (blocked socket, full accept queue, file descriptor exhaustion) and diagnose it with standard Linux tools (`ss`, `lsof`, `strace`, `/proc`)
 - [ ] Be able to answer these from code and measurements in this repo:
@@ -68,7 +68,7 @@ scripts/docker.sh --ulimit nofile=65536:65536 -- \
     scripts/bench.sh epoll --connections 10000 --rate 10000
 ```
 
-`scripts/bench.sh <model> [load_gen options]` starts one server, runs the load generator against it over loopback in the same container, and prints the limits the run happened under, the load generator's report, and the server's peak resident memory.
+`scripts/bench.sh <model> [load_gen options]` starts one server, runs the load generator against it over loopback in the same container, and prints the limits the run happened under, the load generator's report, and the server's peak resident memory. The limit each step up in connections ran into, and what raised it, is recorded in [`docs/scaling.md`](docs/scaling.md).
 
 | Model      | Server                                                    | Source                                                   |
 | ---------- | --------------------------------------------------------- | -------------------------------------------------------- |
@@ -122,6 +122,7 @@ C1M/
 ├── scripts/
 │   ├── docker.sh            # Run a command in the toolchain image
 │   └── bench.sh             # One server, one load generator run, one report
+├── docs/                    # The scaling log
 ├── cmake/                   # CMake modules
 ├── Dockerfile               # The toolchain image
 ├── CMakeLists.txt
