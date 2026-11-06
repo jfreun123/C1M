@@ -6,7 +6,7 @@ Working from the C10k problem up to one million concurrent connections, to learn
 
 - [x] Build the same echo server several ways (thread per connection, `select`, `poll`, `epoll`, `io_uring`) so the models can be compared like for like
 - [ ] Add a UDP echo server next to the TCP ones
-- [ ] Push one machine from 10k to 100k to 1M concurrent connections, recording which limit broke at each step and what fixed it
+- [x] Push one machine from 10k to 100k to 1M concurrent connections, recording which limit broke at each step and what fixed it
 - [x] Write a load generator that can open and hold that many connections
 - [ ] Measure every model:  memory per connection, latency, syscalls per request
 - [ ] Reproduce each failure (blocked socket, full accept queue, file descriptor exhaustion) and diagnose it with standard Linux tools (`ss`, `lsof`, `strace`, `/proc`)

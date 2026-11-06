@@ -156,3 +156,61 @@ scripts/docker.sh --ulimit nofile=262144:262144 \
 
 The server's resident memory is up 3.5 MB on 10k, about 40 bytes for each
 connection, as before.
+
+## 1M: the ceiling on open files, and memory
+
+```bash
+scripts/docker.sh --ulimit nofile=1048576:1048576 \
+    --sysctl net.ipv4.ip_local_port_range="1024 65535" -- \
+    scripts/bench.sh epoll --connections 1000000 --duration 2 \
+    --source 127.0.0.1-127.0.0.32
+```
+
+| Measure                    | Value        |
+| -------------------------- | ------------ |
+| Established                | 1000000      |
+| Connect phase              | 18.8 s       |
+| Time to connect, p50 / p99 | 2.3 / 6.5 ms |
+| Request latency, p50 / p99 | 22 / 136 us  |
+| Server peak resident       | 73824 kB     |
+
+**What was in the way.** Only the open-file limit, again, and this time at
+the top of its range. `fs.nr_open` is the most descriptors the kernel lets
+any process have, 1048576 here, and a million sockets plus a handful of
+other descriptors fits under it. One more is refused, and Docker passes the
+refusal on:
+
+```
+docker run --ulimit nofile=1100000:1100000 ...
+error setting rlimit type 7: operation not permitted
+```
+
+`fs.nr_open` is not one of the sysctls a container can set, so past this
+point the host has to be changed, or the connections split between
+processes.
+
+Thirty-two source addresses, each 48% full at the end, kept the connect
+phase to 19 seconds, 53k connections a second. `ss -s` counted the result
+from inside the container, where both ends of every connection live:
+
+```
+TCP:   2000016 (estab 2000000, closed 15, orphaned 0, timewait 0)
+```
+
+**Memory.** The server's 74 MB is about 70 bytes for each connection. The
+kernel's memory for the sockets is the larger cost and is not in that number.
+Holding the million connections for 30 seconds with `--hold 30`, and reading
+`free -m` in the same container before and during:
+
+| `free -m`  | Before | During |
+| ---------- | ------ | ------ |
+| used       | 2973   | 9691   |
+| buff/cache | 1378   | 5052   |
+| free       | 11809  | 1591   |
+
+Two million sockets, one at each end, took 10.2 GB, about 5 kB each.
+`/proc/net/sockstat` reported TCP `mem` at 2717 pages both times: that
+figure, which `net.ipv4.tcp_mem` limits, counts data queued in socket
+buffers, and an idle connection queues none. The 5 kB is the socket
+structures themselves. This machine has 16 GB, so memory is the next limit
+after `fs.nr_open`, and it would come before two million.
