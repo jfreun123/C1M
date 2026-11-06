@@ -9,3 +9,6 @@ target_include_directories(
 )
 
 target_compile_features(C1M_lib INTERFACE cxx_std_23)
+
+find_package(Threads REQUIRED)
+target_link_libraries(C1M_lib INTERFACE Threads::Threads uring)

@@ -1,3 +1,11 @@
 ---
 Checks: 'bugprone-*,modernize-*,performance-*,readability-*,cppcoreguidelines-*,-modernize-use-trailing-return-type'
 WarningsAsErrors: ''
+# The library is header-only, so the headers are where the code is.
+HeaderFilterRegex: '.*/source/.*'
+CheckOptions:
+  # `fd` is what every man page calls a file descriptor.
+  - key: readability-identifier-length.IgnoredVariableNames
+    value: '^fd$'
+  - key: readability-identifier-length.IgnoredParameterNames
+    value: '^fd$'

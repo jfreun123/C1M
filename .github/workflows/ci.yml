@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+# Every job runs through scripts/docker.sh, so CI builds with the same
+# toolchain image as everyone else. Steps that run io_uring or ThreadSanitizer
+# turn Docker's default seccomp profile off, because it refuses both.
 jobs:
   test:
     name: Tests
@@ -13,19 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang clang-tidy cppcheck ninja-build
-
       - name: Configure
-        run: cmake --preset dev
+        run: scripts/docker.sh cmake --preset dev
 
       - name: Build
-        run: cmake --build --preset dev --parallel
+        run: scripts/docker.sh cmake --build --preset dev --parallel
 
       - name: Test
-        run: ctest --preset dev
+        run: >
+          scripts/docker.sh --security-opt seccomp=unconfined --
+          ctest --preset dev
 
   asan:
     name: AddressSanitizer
@@ -33,19 +33,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang clang-tidy cppcheck ninja-build
-
       - name: Configure
-        run: cmake --preset asan
+        run: scripts/docker.sh cmake --preset asan
 
       - name: Build
-        run: cmake --build --preset asan --parallel
+        run: scripts/docker.sh cmake --build --preset asan --parallel
 
       - name: Test
-        run: ctest --preset asan
+        run: >
+          scripts/docker.sh --security-opt seccomp=unconfined --
+          ctest --preset asan
+
+  tsan:
+    name: ThreadSanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: scripts/docker.sh cmake --preset tsan
+
+      # The build runs the test binary to discover its tests.
+      - name: Build
+        run: >
+          scripts/docker.sh --security-opt seccomp=unconfined --
+          cmake --build --preset tsan --parallel
+
+      - name: Test
+        run: >
+          scripts/docker.sh --security-opt seccomp=unconfined --
+          ctest --preset tsan
 
   bench:
     name: Benchmark
@@ -53,16 +70,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang clang-tidy cppcheck ninja-build
-
       - name: Configure
-        run: cmake --preset bench
+        run: scripts/docker.sh cmake --preset bench
 
       - name: Build
-        run: cmake --build --preset bench --parallel
+        run: scripts/docker.sh cmake --build --preset bench --parallel
 
-      - name: Run
-        run: ./build-bench/benchmark/benchmark
+      # 500 connections stay under select()'s limit of 1024 descriptors.
+      - name: Run every server under a small load
+        run: |
+          for model in threads select poll epoll epoll-et io_uring; do
+            scripts/docker.sh --security-opt seccomp=unconfined -- \
+              scripts/bench.sh "$model" --connections 500 --duration 2
+          done

@@ -1,7 +1,9 @@
 set(
     FORMAT_PATTERNS
     source/*.cpp source/*.hpp
+    app/*.cpp app/*.hpp
     test/*.cpp test/*.hpp
+    benchmark/*.cpp benchmark/*.hpp
     CACHE STRING
     "Patterns to format"
 )

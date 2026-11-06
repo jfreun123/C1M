@@ -9,8 +9,8 @@ endif()
 project(
     C1M
     VERSION 0.1.0
-    DESCRIPTION "Short description"
-    HOMEPAGE_URL "https://example.com/"
+    DESCRIPTION "Echo servers on the way from C10k to one million connections"
+    HOMEPAGE_URL "https://github.com/jfreun123/C1M"
     LANGUAGES CXX
 )
 
@@ -21,6 +21,7 @@ option(C1M_DEVELOPER_MODE "Enable developer mode" ON)
 # ---- Build source ----
 
 add_subdirectory(source)
+add_subdirectory(app)
 
 # ---- Developer mode targets ----
 
