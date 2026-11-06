@@ -100,13 +100,23 @@ std::string pattern(size_t size) {
 }
 
 // Docker's default seccomp profile, among others, refuses io_uring.
+//
+// The probe runs on a thread of its own. The kernel tears a closed ring down
+// later, and part of that work runs on every thread that used the ring,
+// delivered like a signal: a thread blocked in a system call is woken, and a
+// call made with a timeout set returns EINTR rather than restarting. Probed
+// from the test's own thread, the client's connect() and recv() fail that way
+// now and then; under a sanitizer, where everything is slower, often.
 bool uringAvailable() {
-  io_uring ring{};
-  if (::io_uring_queue_init(1, &ring, 0) < 0) {
-    return false;
-  }
-  ::io_uring_queue_exit(&ring);
-  return true;
+  bool available = false;
+  std::thread{[&available] {
+    io_uring ring{};
+    if (::io_uring_queue_init(1, &ring, 0) == 0) {
+      ::io_uring_queue_exit(&ring);
+      available = true;
+    }
+  }}.join();
+  return available;
 }
 
 // Runs one server of each kind on its own thread for the length of a test.
