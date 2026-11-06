@@ -94,6 +94,7 @@ build-bench/benchmark/load_gen --port 9000 --connections 1000 --hold 60
 | ----------------------- | ----------- | ---------------------------------------------------- |
 | `--port`                | required    | Server port                                          |
 | `--host`                | `127.0.0.1` | Server IPv4 address                                  |
+| `--source`              | none        | Addresses to connect from, taken in turn: IPv4 addresses or `A-B` ranges, comma-separated |
 | `--connections`         | 1000        | Connections to open                                  |
 | `--connect-concurrency` | 256         | Connects in flight at any one time                   |
 | `--connect-timeout`     | 10          | Seconds before a connect counts as failed            |

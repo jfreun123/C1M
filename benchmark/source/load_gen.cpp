@@ -29,6 +29,7 @@
 #include <string_view>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -41,7 +42,8 @@ constexpr std::string_view kUsage =
     "usage: load_gen --port N [--host IPV4] [--connections N]\n"
     "                [--connect-concurrency N] [--connect-timeout SECONDS]\n"
     "                [--rate REQUESTS_PER_SECOND] [--duration SECONDS]\n"
-    "                [--size BYTES] [--hold SECONDS]\n";
+    "                [--size BYTES] [--hold SECONDS]\n"
+    "                [--source IPV4|IPV4-IPV4[,...]]\n";
 
 struct Options {
   std::string host = "127.0.0.1";
@@ -53,7 +55,50 @@ struct Options {
   unsigned duration = 5;           // seconds of sending requests
   size_t size = 64;                // bytes per request
   unsigned hold = 0;               // seconds to stay connected afterwards
+  std::vector<in_addr> sources;    // addresses to connect from, in turn
 };
+
+// Enough addresses for four billion connections, and a mistyped range stops
+// short of allocating that many.
+constexpr size_t kMaxSources = size_t{1} << 16;
+
+// One IPv4 address, or two joined by `-` for every address between them.
+std::optional<std::vector<in_addr>> parseAddresses(std::string_view item) {
+  const auto parse = [](std::string_view text) -> std::optional<uint32_t> {
+    in_addr address{};
+    if (::inet_pton(AF_INET, std::string{text}.c_str(), &address) != 1) {
+      return std::nullopt;
+    }
+    return ntohl(address.s_addr);
+  };
+  const size_t dash = item.find('-');
+  const auto first = parse(item.substr(0, dash));
+  const auto last =
+      dash == std::string_view::npos ? first : parse(item.substr(dash + 1));
+  if (!first || !last || *last < *first || *last - *first >= kMaxSources) {
+    return std::nullopt;
+  }
+  std::vector<in_addr> addresses;
+  for (uint64_t host = *first; host <= *last; ++host) {
+    addresses.push_back(in_addr{.s_addr = htonl(static_cast<uint32_t>(host))});
+  }
+  return addresses;
+}
+
+// A comma-separated list of what parseAddresses() takes.
+std::optional<std::vector<in_addr>> parseSources(std::string_view list) {
+  std::vector<in_addr> sources;
+  for (size_t start = 0; start <= list.size();) {
+    const size_t comma = std::min(list.find(',', start), list.size());
+    const auto addresses = parseAddresses(list.substr(start, comma - start));
+    if (!addresses || sources.size() + addresses->size() > kMaxSources) {
+      return std::nullopt;
+    }
+    sources.insert(sources.end(), addresses->begin(), addresses->end());
+    start = comma + 1;
+  }
+  return sources;
+}
 
 std::optional<Options> parseOptions(std::span<const char *const> args) {
   const auto flags = C1M::parseFlags(args.subspan(1));
@@ -83,6 +128,12 @@ std::optional<Options> parseOptions(std::span<const char *const> args) {
       valid = C1M::assignNumber(options.size, value) && options.size > 0;
     } else if (name == "--hold") {
       valid = C1M::assignNumber(options.hold, value);
+    } else if (name == "--source") {
+      auto sources = parseSources(value);
+      valid = sources.has_value();
+      if (valid) {
+        options.sources = std::move(*sources);
+      }
     }
     if (!valid) {
       return std::nullopt;
@@ -227,12 +278,34 @@ private:
   static constexpr size_t kMaxBurst = 1024;
   static constexpr int kMaxEvents = 1024;
 
+  // The port is left for connect() to pick: chosen here, it would have to be
+  // unique among every socket on the address, whatever each one connects to,
+  // and the search for one gets slow as they run out.
+  static bool bindSource(int fd, in_addr source) {
+    const int enable = 1;
+    if (::setsockopt(fd, IPPROTO_IP, IP_BIND_ADDRESS_NO_PORT, &enable,
+                     sizeof(enable)) < 0) {
+      return false;
+    }
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr = source;
+    return ::bind(fd, C1M::asSockaddr(address), sizeof(address)) == 0;
+  }
+
   void startConnect(size_t index) {
     Client &client = mClients[index];
     client.since = Clock::now();
     client.fd.reset(
         ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0));
     if (!client.fd) {
+      fail(client, errno);
+      return;
+    }
+    // Source addresses are taken in turn.
+    if (!mOptions.sources.empty() &&
+        !bindSource(client.fd.get(),
+                    mOptions.sources[index % mOptions.sources.size()])) {
       fail(client, errno);
       return;
     }
