@@ -109,5 +109,50 @@ server:    peak resident memory 7576 kB
 
 That is 64512 ports in the range, less port 9000, which the server itself is
 listening on. The widened range is the most one source address can give, so
-widening it does not get to 100k. The next step needs more source addresses,
-and the load generator cannot bind to them yet.
+widening it does not get to 100k.
+
+## 100k: source addresses
+
+**What raised it.** `load_gen` gained `--source`, a list of addresses to
+connect from, taken in turn. Every address is a port range of its own, so two
+of them give 129022 connections. On loopback no setup is needed: Linux answers
+to all of 127.0.0.0/8. Each socket is bound to its address with
+`IP_BIND_ADDRESS_NO_PORT` set, which leaves the port for `connect()` to pick
+against the whole four-tuple, the same choice an unbound socket gets.
+
+```bash
+scripts/docker.sh --ulimit nofile=262144:262144 \
+    --sysctl net.ipv4.ip_local_port_range="1024 65535" -- \
+    scripts/bench.sh epoll --connections 100000 --duration 2 \
+    --source 127.0.0.1-127.0.0.2
+```
+
+```
+connect:   100000 requested, 100000 established, 0 failed in 79.034 s
+           time to connect: p50 2203 us, p99 597582 us, max 689024 us
+```
+
+**What was still slow.** Every connection was made, but 79 seconds is the
+same cost the failed runs paid. Picking a port starts somewhere in the range
+and walks until it finds a free one, so the walk lengthens as the range
+fills, and by the end each address was 78% full. The time to connect shows it
+as a tail: p99 at 600 ms against a p50 of 2 ms. Four addresses, 39% full at
+the end, took a seventieth of the time:
+
+```bash
+scripts/docker.sh --ulimit nofile=262144:262144 \
+    --sysctl net.ipv4.ip_local_port_range="1024 65535" -- \
+    scripts/bench.sh epoll --connections 100000 --duration 2 \
+    --source 127.0.0.1-127.0.0.4
+```
+
+| Measure                    | Value       |
+| -------------------------- | ----------- |
+| Established                | 100000      |
+| Connect phase              | 1.1 s       |
+| Time to connect, p99       | 3.0 ms      |
+| Request latency, p50 / p99 | 45 / 185 us |
+| Server peak resident       | 7600 kB     |
+
+The server's resident memory is up 3.5 MB on 10k, about 40 bytes for each
+connection, as before.
